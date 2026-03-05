@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kutimoy Boardgame Recorder</title>
+  <meta name="description" content="Track your board game sessions — log games played, participants, winners, and dates. Export and import your history as JSON." />
+  <meta name="keywords" content="board game tracker, boardgame log, game session recorder, board game history, kutimoy" />
+  <meta name="author" content="Kutimoy" />
+  <meta name="robots" content="index, follow" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Kutimoy Boardgame Recorder" />
+  <meta property="og:description" content="Track your board game sessions — log games played, participants, winners, and dates." />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Kutimoy Boardgame Recorder" />
+  <meta name="twitter:description" content="Track your board game sessions — log games played, participants, winners, and dates." />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-D9CS3MV264"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-D9CS3MV264');
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen font-sans">
+
+  <div x-data="logbook()" x-cloak class="max-w-4xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <header class="mb-8 text-center">
+      <h1 class="text-4xl font-bold text-amber-400 tracking-tight">Kutimoy Boardgame Recorder</h1>
+      <p class="text-gray-400 mt-1 text-sm">Track every session, every winner.</p>
+    </header>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-800 mb-6">
+      <button
+        @click="activeTab = 'log'"
+        :class="activeTab === 'log' ? 'border-b-2 border-amber-400 text-amber-400' : 'text-gray-400 hover:text-gray-200'"
+        class="px-5 py-2 text-sm font-medium transition-colors"
+      >Log Session</button>
+      <button
+        @click="activeTab = 'history'"
+        :class="activeTab === 'history' ? 'border-b-2 border-amber-400 text-amber-400' : 'text-gray-400 hover:text-gray-200'"
+        class="px-5 py-2 text-sm font-medium transition-colors"
+      >History
+        <span x-show="sessions.length" class="ml-1 bg-gray-700 text-gray-300 text-xs rounded-full px-2 py-0.5" x-text="sessions.length"></span>
+      </button>
+      <button
+        @click="activeTab = 'data'"
+        :class="activeTab === 'data' ? 'border-b-2 border-amber-400 text-amber-400' : 'text-gray-400 hover:text-gray-200'"
+        class="px-5 py-2 text-sm font-medium transition-colors"
+      >Import / Export</button>
+    </div>
+
+    <!-- ===================== LOG SESSION ===================== -->
+    <div x-show="activeTab === 'log'" x-transition>
+      <div class="bg-gray-900 rounded-2xl p-6 space-y-5 border border-gray-800">
+
+        <!-- Board Game -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-1">Board Game</label>
+          <div class="relative">
+            <input
+              x-model="form.game"
+              @input="showGameSuggestions = true"
+              @focus="showGameSuggestions = true"
+              @keydown.escape="showGameSuggestions = false"
+              @keydown.enter.prevent="selectGame(form.game)"
+              type="text"
+              placeholder="e.g. Catan, Ticket to Ride..."
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition-colors"
+            />
+            <!-- Dropdown suggestions -->
+            <ul
+              x-show="showGameSuggestions && filteredGames.length > 0"
+              @click.outside="showGameSuggestions = false"
+              class="absolute z-10 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden"
+            >
+              <template x-for="game in filteredGames" :key="game">
+                <li
+                  @click="selectGame(game)"
+                  class="px-4 py-2 text-sm text-gray-200 hover:bg-amber-500 hover:text-gray-900 cursor-pointer transition-colors"
+                  x-text="game"
+                ></li>
+              </template>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Date and Time -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Date</label>
+            <input
+              x-model="form.date"
+              type="date"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Time</label>
+            <input
+              x-model="form.time"
+              type="time"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
+            />
+          </div>
+        </div>
+
+        <!-- Participants -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-1">Participants</label>
+          <div class="flex gap-2 mb-2">
+            <input
+              x-model="participantInput"
+              @keydown.enter.prevent="addParticipant"
+              type="text"
+              placeholder="Enter name, press Enter"
+              class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition-colors"
+            />
+            <button
+              @click="addParticipant"
+              class="bg-amber-500 hover:bg-amber-400 text-gray-900 font-semibold px-4 rounded-lg text-sm transition-colors"
+            >Add</button>
+          </div>
+          <!-- Participant chips -->
+          <div class="flex flex-wrap gap-2 min-h-[2rem]">
+            <template x-for="(p, i) in form.participants" :key="i">
+              <span class="flex items-center gap-1.5 bg-gray-700 text-gray-200 text-xs px-3 py-1.5 rounded-full">
+                <span x-text="p"></span>
+                <button @click="removeParticipant(i)" class="text-gray-400 hover:text-red-400 transition-colors leading-none">&times;</button>
+              </span>
+            </template>
+            <span x-show="form.participants.length === 0" class="text-xs text-gray-600 italic self-center">No participants added yet</span>
+          </div>
+        </div>
+
+        <!-- Winner -->
+        <div x-show="form.participants.length > 0" x-transition>
+          <label class="block text-sm font-medium text-gray-300 mb-1">Winner</label>
+          <select
+            x-model="form.winner"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
+          >
+            <option value="">-- Select winner (optional) --</option>
+            <template x-for="p in form.participants" :key="p">
+              <option :value="p" x-text="p"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-1">Notes <span class="text-gray-500 font-normal">(optional)</span></label>
+          <textarea
+            x-model="form.notes"
+            rows="2"
+            placeholder="Any remarks about this session..."
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition-colors resize-none"
+          ></textarea>
+        </div>
+
+        <!-- Validation message -->
+        <p x-show="formError" x-text="formError" class="text-red-400 text-sm"></p>
+
+        <!-- Submit -->
+        <div class="flex justify-end pt-1">
+          <button
+            @click="saveSession"
+            class="bg-amber-500 hover:bg-amber-400 text-gray-900 font-bold px-6 py-2.5 rounded-lg text-sm transition-colors"
+          >Save Session</button>
+        </div>
+      </div>
+
+      <!-- Success toast -->
+      <div
+        x-show="showToast"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 translate-y-2"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed bottom-6 right-6 bg-green-600 text-white text-sm font-medium px-5 py-3 rounded-xl shadow-lg"
+      >Session saved!</div>
+    </div>
+
+    <!-- ===================== HISTORY ===================== -->
+    <div x-show="activeTab === 'history'" x-transition>
+
+      <!-- Search / filter -->
+      <div class="flex gap-3 mb-4">
+        <input
+          x-model="historySearch"
+          type="text"
+          placeholder="Search by game or participant..."
+          class="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 transition-colors"
+        />
+        <select
+          x-model="historyGameFilter"
+          class="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
+        >
+          <option value="">All games</option>
+          <template x-for="g in knownGames" :key="g">
+            <option :value="g" x-text="g"></option>
+          </template>
+        </select>
+      </div>
+
+      <!-- Empty state -->
+      <div x-show="filteredSessions.length === 0" class="text-center py-20 text-gray-600">
+        <p class="text-5xl mb-4">🎲</p>
+        <p class="text-lg font-medium text-gray-500">No sessions recorded yet</p>
+        <p class="text-sm mt-1">Log your first game session to see it here.</p>
+      </div>
+
+      <!-- Session cards -->
+      <div class="space-y-3">
+        <template x-for="(s, i) in filteredSessions" :key="s.id">
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-gray-700 transition-colors">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="font-semibold text-white text-base" x-text="s.game"></h3>
+                  <span x-show="s.winner" class="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full font-medium">
+                    Winner: <span x-text="s.winner"></span>
+                  </span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1" x-text="formatDateTime(s.date, s.time)"></p>
+                <div class="flex flex-wrap gap-1.5 mt-2">
+                  <template x-for="p in s.participants" :key="p">
+                    <span
+                      :class="p === s.winner ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-gray-800 text-gray-300'"
+                      class="text-xs px-2 py-0.5 rounded-full"
+                      x-text="p"
+                    ></span>
+                  </template>
+                </div>
+                <p x-show="s.notes" x-text="s.notes" class="text-xs text-gray-500 mt-2 italic"></p>
+              </div>
+              <button
+                @click="deleteSession(s.id)"
+                class="text-gray-600 hover:text-red-400 transition-colors shrink-0 text-lg leading-none"
+                title="Delete session"
+              >&times;</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ===================== IMPORT / EXPORT ===================== -->
+    <div x-show="activeTab === 'data'" x-transition>
+      <div class="space-y-6">
+
+        <!-- Export -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h2 class="text-base font-semibold text-gray-100 mb-1">Export Data</h2>
+          <p class="text-xs text-gray-500 mb-4">Copy the JSON below to back up all your sessions and game list.</p>
+          <div class="relative">
+            <textarea
+              x-ref="exportArea"
+              readonly
+              :value="exportJson"
+              rows="10"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono focus:outline-none resize-none"
+            ></textarea>
+            <button
+              @click="copyExport"
+              class="absolute top-3 right-3 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs px-3 py-1.5 rounded-md transition-colors"
+              x-text="copyLabel"
+            ></button>
+          </div>
+        </div>
+
+        <!-- Import -->
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h2 class="text-base font-semibold text-gray-100 mb-1">Import Data</h2>
+          <p class="text-xs text-gray-500 mb-4">Paste exported JSON to restore or merge sessions. Duplicate IDs will be skipped.</p>
+          <textarea
+            x-model="importJson"
+            rows="10"
+            placeholder='Paste JSON here...'
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono focus:outline-none focus:border-amber-500 transition-colors resize-none mb-3"
+          ></textarea>
+          <p x-show="importError" x-text="importError" class="text-red-400 text-xs mb-3"></p>
+          <p x-show="importSuccess" x-text="importSuccess" class="text-green-400 text-xs mb-3"></p>
+          <div class="flex gap-3">
+            <button
+              @click="importData"
+              class="bg-amber-500 hover:bg-amber-400 text-gray-900 font-bold px-5 py-2 rounded-lg text-sm transition-colors"
+            >Import</button>
+            <button
+              @click="importJson = ''; importError = ''; importSuccess = ''"
+              class="bg-gray-700 hover:bg-gray-600 text-gray-300 px-5 py-2 rounded-lg text-sm transition-colors"
+            >Clear</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /max-w -->
+
+  <script>
+    function logbook() {
+      return {
+        activeTab: 'log',
+        showToast: false,
+        showGameSuggestions: false,
+        formError: '',
+
+        form: {
+          game: '',
+          date: new Date().toISOString().slice(0, 10),
+          time: new Date().toTimeString().slice(0, 5),
+          participants: [],
+          winner: '',
+          notes: '',
+        },
+        participantInput: '',
+
+        sessions: [],
+        knownGames: [],
+
+        historySearch: '',
+        historyGameFilter: '',
+
+        copyLabel: 'Copy',
+        exportJson: '',
+        importJson: '',
+        importError: '',
+        importSuccess: '',
+
+        init() {
+          this.sessions = JSON.parse(localStorage.getItem('logbook_sessions') || '[]');
+          this.knownGames = JSON.parse(localStorage.getItem('logbook_games') || '[]');
+          this.$watch('sessions', () => this.persistSessions());
+          this.$watch('knownGames', () => this.persistGames());
+          this.$watch('activeTab', (tab) => {
+            if (tab === 'data') this.refreshExport();
+          });
+        },
+
+        persistSessions() {
+          localStorage.setItem('logbook_sessions', JSON.stringify(this.sessions));
+        },
+        persistGames() {
+          localStorage.setItem('logbook_games', JSON.stringify(this.knownGames));
+        },
+
+        get filteredGames() {
+          const q = this.form.game.trim().toLowerCase();
+          if (!q) return this.knownGames;
+          return this.knownGames.filter(g => g.toLowerCase().includes(q));
+        },
+
+        selectGame(game) {
+          this.form.game = game;
+          this.showGameSuggestions = false;
+        },
+
+        addParticipant() {
+          const name = this.participantInput.trim();
+          if (!name) return;
+          if (this.form.participants.includes(name)) {
+            this.participantInput = '';
+            return;
+          }
+          this.form.participants.push(name);
+          this.participantInput = '';
+        },
+
+        removeParticipant(index) {
+          const removed = this.form.participants[index];
+          this.form.participants.splice(index, 1);
+          if (this.form.winner === removed) this.form.winner = '';
+        },
+
+        saveSession() {
+          this.formError = '';
+          if (!this.form.game.trim()) {
+            this.formError = 'Please enter a board game name.';
+            return;
+          }
+          if (!this.form.date) {
+            this.formError = 'Please select a date.';
+            return;
+          }
+          if (this.form.participants.length === 0) {
+            this.formError = 'Please add at least one participant.';
+            return;
+          }
+
+          const session = {
+            id: crypto.randomUUID(),
+            game: this.form.game.trim(),
+            date: this.form.date,
+            time: this.form.time,
+            participants: [...this.form.participants],
+            winner: this.form.winner,
+            notes: this.form.notes.trim(),
+            createdAt: new Date().toISOString(),
+          };
+
+          this.sessions.unshift(session);
+
+          // Register game if new
+          if (!this.knownGames.includes(session.game)) {
+            this.knownGames.push(session.game);
+            this.knownGames.sort((a, b) => a.localeCompare(b));
+          }
+
+          this.resetForm();
+          this.flashToast();
+        },
+
+        resetForm() {
+          this.form = {
+            game: '',
+            date: new Date().toISOString().slice(0, 10),
+            time: new Date().toTimeString().slice(0, 5),
+            participants: [],
+            winner: '',
+            notes: '',
+          };
+          this.participantInput = '';
+          this.formError = '';
+        },
+
+        flashToast() {
+          this.showToast = true;
+          setTimeout(() => { this.showToast = false; }, 3000);
+        },
+
+        deleteSession(id) {
+          if (!confirm('Delete this session?')) return;
+          this.sessions = this.sessions.filter(s => s.id !== id);
+        },
+
+        get filteredSessions() {
+          let list = [...this.sessions];
+          if (this.historyGameFilter) {
+            list = list.filter(s => s.game === this.historyGameFilter);
+          }
+          if (this.historySearch.trim()) {
+            const q = this.historySearch.toLowerCase();
+            list = list.filter(s =>
+              s.game.toLowerCase().includes(q) ||
+              s.participants.some(p => p.toLowerCase().includes(q)) ||
+              (s.winner && s.winner.toLowerCase().includes(q))
+            );
+          }
+          return list;
+        },
+
+        formatDateTime(date, time) {
+          if (!date) return '';
+          const d = new Date(`${date}T${time || '00:00'}`);
+          return d.toLocaleString(undefined, {
+            weekday: 'short', year: 'numeric', month: 'short',
+            day: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+        },
+
+        refreshExport() {
+          const data = {
+            sessions: this.sessions,
+            knownGames: this.knownGames,
+            exportedAt: new Date().toISOString(),
+          };
+          this.exportJson = JSON.stringify(data, null, 2);
+        },
+
+        async copyExport() {
+          this.refreshExport();
+          try {
+            await navigator.clipboard.writeText(this.exportJson);
+            this.copyLabel = 'Copied!';
+            setTimeout(() => { this.copyLabel = 'Copy'; }, 2000);
+          } catch {
+            this.$refs.exportArea.select();
+            document.execCommand('copy');
+            this.copyLabel = 'Copied!';
+            setTimeout(() => { this.copyLabel = 'Copy'; }, 2000);
+          }
+        },
+
+        importData() {
+          this.importError = '';
+          this.importSuccess = '';
+          let parsed;
+          try {
+            parsed = JSON.parse(this.importJson.trim());
+          } catch {
+            this.importError = 'Invalid JSON. Please check the format and try again.';
+            return;
+          }
+
+          const incoming = parsed.sessions || parsed; // support bare array too
+          if (!Array.isArray(incoming)) {
+            this.importError = 'Expected a JSON object with a "sessions" array, or a bare array of sessions.';
+            return;
+          }
+
+          const existingIds = new Set(this.sessions.map(s => s.id));
+          let added = 0;
+          for (const s of incoming) {
+            if (!s.id || existingIds.has(s.id)) continue;
+            this.sessions.unshift(s);
+            existingIds.add(s.id);
+            added++;
+            if (!this.knownGames.includes(s.game)) {
+              this.knownGames.push(s.game);
+            }
+          }
+          this.knownGames.sort((a, b) => a.localeCompare(b));
+
+          // Merge incoming knownGames if present
+          if (Array.isArray(parsed.knownGames)) {
+            for (const g of parsed.knownGames) {
+              if (!this.knownGames.includes(g)) this.knownGames.push(g);
+            }
+            this.knownGames.sort((a, b) => a.localeCompare(b));
+          }
+
+          this.importSuccess = `${added} session(s) imported successfully.`;
+          this.importJson = '';
+          this.refreshExport();
+        },
+      };
+    }
+  </script>
+</body>
+</html>
