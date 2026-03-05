@@ -4,13 +4,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "http-server . -p 8080 -o"
+    "build:css": "tailwindcss -i ./input.css -o ./output.css --minify",
+    "start": "http-server . -p 8081 -o"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "http-server": "^14.1.1"
+    "@tailwindcss/cli": "^4.2.1",
+    "http-server": "^14.1.1",
+    "tailwindcss": "^4.2.1"
   }
 }
